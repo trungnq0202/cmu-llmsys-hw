@@ -102,8 +102,26 @@ def topological_sort(variable: Variable) -> Iterable[Variable]:
     """
     # BEGIN ASSIGN1_1
     # TODO
+    ordering = []
+    visited_ids = set()
+
+    def recurse(variable: Variable):
+
+        if variable.is_constant():
+            return
     
-    raise NotImplementedError("Task Autodiff Not Implemented Yet")
+        if not variable.is_leaf():
+            for p in variable.parents:
+                if p.unique_id not in visited_ids:
+                    recurse(p)
+        
+        ordering.append(variable)
+        visited_ids.add(variable.unique_id)
+
+    recurse(variable)
+    return ordering[::-1]
+
+    # raise NotImplementedError("Task Autodiff Not Implemented Yet")
     # END ASSIGN1_1
 
 
@@ -120,8 +138,25 @@ def backpropagate(variable: Variable, deriv: Any) -> None:
     """
     # BEGIN ASSIGN1_1
     # TODO
-   
-    raise NotImplementedError("Task Autodiff Not Implemented Yet")
+    
+    def add_outgrads(prev_g, g):
+        if prev_g is None:
+            return g
+        return prev_g + g
+
+    outgrads = {variable.unique_id: deriv}
+    topo_order = topological_sort(variable)
+    for node in topo_order:
+        if node.unique_id not in outgrads:
+            continue
+        outgrad = outgrads.pop(node.unique_id)
+        for parent, d_parent in node.chain_rule(outgrad):
+            if parent.is_leaf():
+                parent.accumulate_derivative(d_parent)
+            else:
+                outgrads[parent.unique_id] = add_outgrads(outgrads.get(parent.unique_id), d_parent)
+
+    # raise NotImplementedError("Task Autodiff Not Implemented Yet")
     # END ASSIGN1_1
 
 

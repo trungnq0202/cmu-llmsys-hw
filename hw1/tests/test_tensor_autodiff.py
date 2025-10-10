@@ -70,6 +70,7 @@ def test_one_derivative(
 ) -> None:
     "Test the gradient of a one-arg tensor function"
     name, _, tensor_fn = fn
+    print(f"name: {name}, fn: {tensor_fn}")
     grad_check(tensor_fn, t1)
 
 

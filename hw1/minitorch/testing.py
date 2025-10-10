@@ -216,3 +216,6 @@ class MathTestVariable(MathTest):
 # one_arg, two_arg, red_arg = MathTestVariable._comp_testing()
 # for i, (name, f1, f2) in enumerate(two_arg):
 #     print(f"ONE_ARG{i+1} = {name}")
+
+# for i, (name, f1, f2) in enumerate(one_arg):
+#     print(name, f1, f2)
