@@ -293,8 +293,17 @@ __global__ void mapKernel(
     // 4. Calculate the position of element in in_array according to in_index and in_strides
     // 5. Calculate the position of element in out_array according to out_index and out_strides
     // 6. Apply the unary function to the input element and write the output to the out memory
-    
-    assert(false && "Not Implemented");
+    int pos = blockIdx.x * blockDim.x + threadIdx.x; // 1
+    if (pos >= out_size) {
+        return;
+    }
+    to_index(pos, out_shape, out_index, shape_size); // 2
+    broadcast_index(out_index, out_shape, in_shape, in_index, shape_size, shape_size); //3
+    int in_pos = index_to_position(in_index, in_strides, shape_size); // 4
+    int out_pos = index_to_position(out_index, out_strides, shape_size); // 5
+    out[out_pos] = fn(fn_id, in_storage[in_pos]); //6
+
+    // assert(false && "Not Implemented");
     /// END ASSIGN1_2
 }
 
@@ -350,8 +359,26 @@ __global__ void reduceKernel(
     // 3. Initialize the reduce_value to the output element
     // 4. Iterate over the reduce_dim dimension of the input array to compute the reduced value
     // 5. Write the reduced value to out memory
+    int pos = blockIdx.x * blockDim.x + threadIdx.x; //1
+    if (pos >= out_size) {
+        return;
+    }
     
-    assert(false && "Not Implemented");
+    to_index(pos, out_shape, out_index, shape_size); //2
+    int out_pos = index_to_position(out_index, out_strides, shape_size);
+
+    // No need for step 3?
+    float current_reduce_value = reduce_value;
+    
+    for (int s = 0; s < a_shape[reduce_dim]; s++) { //4
+      out_index[reduce_dim] = s;
+      int j = index_to_position(out_index, a_strides, shape_size);
+      current_reduce_value = fn(fn_id, current_reduce_value, a_storage[j]);
+    }
+
+    out[out_pos] = current_reduce_value; //5
+
+    // assert(false && "Not Implemented");
     /// END ASSIGN1_2
 }
 
@@ -416,8 +443,19 @@ __global__ void zipKernel(
     // 6. Broadcast the out_index to the b_index according to b_shape
     // 7.Calculate the position of element in b_array according to b_index and b_strides
     // 8. Apply the binary function to the input elements in a_array & b_array and write the output to the out memory
-    
-    assert(false && "Not Implemented");
+    int pos = blockIdx.x * blockDim.x + threadIdx.x; //1
+    if (pos >= out_size) {
+        return;
+    }
+    to_index(pos, out_shape, out_index, out_shape_size); //2
+    int out_pos = index_to_position(out_index, out_strides, out_shape_size); //3
+    broadcast_index(out_index, out_shape, a_shape, a_index, out_shape_size, a_shape_size); //4
+    int a_pos = index_to_position(a_index, a_strides, a_shape_size); //5
+    broadcast_index(out_index, out_shape, b_shape, b_index, out_shape_size, b_shape_size); //6
+    int b_pos = index_to_position(b_index, b_strides, b_shape_size); //7
+    out[out_pos] = fn(fn_id, a_storage[a_pos], b_storage[b_pos]); //8
+
+    // assert(false && "Not Implemented");
     /// END ASSIGN1_2
 }
 
