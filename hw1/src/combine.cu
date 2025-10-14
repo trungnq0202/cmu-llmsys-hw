@@ -239,9 +239,44 @@ __global__ void MatrixMultiplyKernel(
     // 4. Synchronize to make sure the data is available to all threads
     // 5. Compute the output tile for this thread block
     // 6. Synchronize to make sure all threads are done computing the output tile for (row, col)
-    // 7. Write the output to global memory
+    // 7. Write the output to global memory 
+    
+    //1
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+    int M = a_shape[1], N = a_shape[2], P = b_shape[2];
+    int tx = threadIdx.x, ty = threadIdx.y;
 
-    assert(false && "Not Implemented");
+    //2
+    int out_index = batch*out_strides[0] + row*out_strides[1] + col*out_strides[2];
+
+    float Pvalue = 0.0f;
+
+    for (int ph=0; ph < (N + TILE - 1) / TILE; ++ph) { //3
+      int a_col = ph*TILE + tx;
+      if ((row < M) && (a_col < N)) 
+        a_shared[ty][tx] = a_storage[batch*a_batch_stride + row*a_strides[1] + a_col*a_strides[2]];
+      else a_shared[ty][tx] = 0.0f;
+      
+      int b_row = ph*TILE + ty;
+      if ((b_row < N) && (col < P))
+        b_shared[ty][tx] = b_storage[batch*b_batch_stride + b_row*b_strides[1] + col*b_strides[2]];
+      else b_shared[ty][tx] = 0.0f;
+
+      __syncthreads(); // 4
+      
+      for (int k = 0; k < TILE; ++k) { //5
+        Pvalue += a_shared[ty][k] * b_shared[k][tx]; 
+      }
+
+      __syncthreads(); //6
+    }
+
+    if ((row < M) && (col < P)) {
+      out[out_index] = Pvalue;
+    }
+    
+    // assert(false && "Not Implemented");
     /// END ASSIGN1_2
 }
 
@@ -502,7 +537,9 @@ void MatrixMultiply(
 
     int threadsPerBlock = 32;
     dim3 blockDims(threadsPerBlock, threadsPerBlock, 1); // Adjust these values based on your specific requirements
-    dim3 gridDims((m + threadsPerBlock - 1) / threadsPerBlock, (p + threadsPerBlock - 1) / threadsPerBlock, batch);
+    dim3 gridDims((p + threadsPerBlock - 1) / threadsPerBlock,  // X for columns
+              (m + threadsPerBlock - 1) / threadsPerBlock,  // Y for rows
+              batch);
     MatrixMultiplyKernel<<<gridDims, blockDims>>>(
         d_out, d_out_shape, d_out_strides, d_a, d_a_shape, d_a_strides, d_b, d_b_shape, d_b_strides
     );
