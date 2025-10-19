@@ -384,8 +384,6 @@ __global__ void reduceKernel(
    *  None (Fills in out array)
    */
 
-    // __shared__ double cache[BLOCK_DIM]; // Uncomment this line if you want to use shared memory to store partial results
-    int out_index[MAX_DIMS];
 
     /// BEGIN ASSIGN1_2
     /// TODO
@@ -394,6 +392,59 @@ __global__ void reduceKernel(
     // 3. Initialize the reduce_value to the output element
     // 4. Iterate over the reduce_dim dimension of the input array to compute the reduced value
     // 5. Write the reduced value to out memory
+
+    
+    // ------------------ Optimized version ----------------------
+    // __shared__ float cache[BLOCK_DIM]; // Changed to float to match input type
+    // int a_index[MAX_DIMS];
+    // int out_index[MAX_DIMS];
+
+    // int tx = threadIdx.x;
+    
+    // // Each block handles one output element
+    // // blockIdx.x corresponds to which output element this block computes
+    // int out_pos_linear = blockIdx.x;
+    
+    // // Convert output position to index
+    // to_index(out_pos_linear, out_shape, out_index, shape_size);
+    
+    // // Initialize accumulator with identity value
+    // float thread_sum = reduce_value;
+    
+    // // Each thread processes multiple elements along reduce_dim with stride
+    // // This provides better memory coalescing and handles arbitrary reduce_dim sizes
+    // for (int i = tx; i < a_shape[reduce_dim]; i += blockDim.x) {
+    //     // Build the input index from output index
+    //     for (int d = 0; d < shape_size; d++) {
+    //         a_index[d] = out_index[d];
+    //     }
+    //     // Set the reduce dimension to current iteration
+    //     a_index[reduce_dim] = i;
+        
+    //     int in_pos = index_to_position(a_index, a_strides, shape_size);
+    //     thread_sum = fn(fn_id, thread_sum, a_storage[in_pos]);
+    // }
+    
+    // // Store thread result in shared memory
+    // cache[tx] = thread_sum;
+    // __syncthreads();
+    
+    // // Tree reduction in shared memory with better thread utilization
+    // for (int s = blockDim.x / 2; s > 0; s >>= 1) {
+    //     if (tx < s) {
+    //         cache[tx] = fn(fn_id, cache[tx], cache[tx + s]);
+    //     }
+    //     __syncthreads();
+    // }
+    
+    // // Thread 0 writes the final result
+    // if (tx == 0) {
+    //     int out_pos = index_to_position(out_index, out_strides, shape_size);
+    //     out[out_pos] = cache[0];
+    // }
+
+    //-------------------- Unoptimized version --------------------
+    int out_index[MAX_DIMS];
     int pos = blockIdx.x * blockDim.x + threadIdx.x; //1
     if (pos >= out_size) {
         return;
@@ -413,7 +464,6 @@ __global__ void reduceKernel(
 
     out[out_pos] = current_reduce_value; //5
 
-    // assert(false && "Not Implemented");
     /// END ASSIGN1_2
 }
 
@@ -743,6 +793,26 @@ void tensorReduce(
         d_a, d_a_shape, d_a_strides, 
         reduce_dim, reduce_value, shape_size, fn_id
     );
+
+    //----------- Launch kernel (Optimized with shared memory) -----------
+    // Each block handles one output element
+    // Use enough threads to efficiently reduce along the reduce_dim
+    // int threadsPerBlock = 256; // Good balance for most cases
+    // if (a_shape[reduce_dim] < 256) {
+    //     // Use power of 2 for optimal reduction
+    //     threadsPerBlock = 1;
+    //     while (threadsPerBlock < a_shape[reduce_dim]) {
+    //         threadsPerBlock *= 2;
+    //     }
+    //     if (threadsPerBlock > 1024) threadsPerBlock = 1024; // Max threads per block
+    // }
+    
+    // int blocksPerGrid = out_size; // One block per output element
+    // reduceKernel<<<blocksPerGrid, threadsPerBlock>>>(
+    //     d_out, d_out_shape, d_out_strides, out_size, 
+    //     d_a, d_a_shape, d_a_strides, 
+    //     reduce_dim, reduce_value, shape_size, fn_id
+    // );
     
     // Copy back to the host
     cudaMemcpy(out, d_out, out_size * sizeof(float), cudaMemcpyDeviceToHost);
